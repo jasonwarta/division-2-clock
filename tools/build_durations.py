@@ -31,8 +31,27 @@ CURRENT_HOUR_DURATIONS = [
 
 
 def parse_csv(path):
+    """Returns (rows, embedded_anchor_time).
+
+    Skips '# key=value' header comments at the top of the file, extracting
+    'anchor_time' if present. Then reads the regular CSV body.
+    """
     rows = []
+    embedded_anchor_time = None
     with open(path, newline="") as f:
+        while True:
+            pos = f.tell()
+            line = f.readline()
+            if not line:
+                break
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                content = stripped.lstrip("#").strip()
+                if content.startswith("anchor_time="):
+                    embedded_anchor_time = content.split("=", 1)[1].strip()
+                continue
+            f.seek(pos)
+            break
         reader = csv.DictReader(f)
         for row in reader:
             try:
@@ -42,7 +61,7 @@ def parse_csv(path):
             except (KeyError, ValueError):
                 continue
     rows.sort()
-    return rows
+    return rows, embedded_anchor_time
 
 
 def compute_minute_durations(rows, max_sane_duration_sec):
@@ -217,11 +236,12 @@ def main():
     ap.add_argument(
         "--anchor-time",
         help="ISO 8601 wall-clock time corresponding to video_ms=0 (recording start). "
-        "If given, emits a DEFAULT_ANCHOR_MS constant computed from the first valid CSV row.",
+        "Overrides the # anchor_time= header that ocr_clock.py writes into the CSV. "
+        "If neither is provided, no DEFAULT_ANCHOR_MS is emitted.",
     )
     args = ap.parse_args()
 
-    rows = parse_csv(args.csv_path)
+    rows, embedded_anchor_time = parse_csv(args.csv_path)
     if not rows:
         sys.exit("No usable rows in CSV.")
 
@@ -232,8 +252,12 @@ def main():
     emit_hour_array(hour_summary)
     if args.minute:
         emit_minute_array(per_minute)
-    if args.anchor_time:
-        recording_start_ms = parse_iso_to_utc_ms(args.anchor_time)
+
+    anchor_time = args.anchor_time or embedded_anchor_time
+    if anchor_time:
+        if embedded_anchor_time and not args.anchor_time:
+            print(f"Using embedded anchor_time from CSV: {embedded_anchor_time}", file=sys.stderr)
+        recording_start_ms = parse_iso_to_utc_ms(anchor_time)
         # Use new durations where available, falling back to 2021 values for
         # uncovered hours so the cumulative offset is still computable.
         merged_durations = [
@@ -244,7 +268,7 @@ def main():
         wall_clock_ms = recording_start_ms + ms
         ingame_offset_sec = ingame_to_real_seconds(h, m, merged_durations)
         anchor_ms = wall_clock_ms - ingame_offset_sec * 1000
-        emit_anchor(anchor_ms, args.anchor_time, (h, m, ms), merged_durations)
+        emit_anchor(anchor_ms, anchor_time, (h, m, ms), merged_durations)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ import csv
 import os
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import cv2
@@ -79,6 +80,29 @@ def pick_bbox(video_path):
     print(f"--bbox {x},{y},{w},{h}")
 
 
+def infer_start_time_iso(video_path, fps, total_frames):
+    """Infer wall-clock time when frame 0 was recorded.
+
+    For most screen recorders (OBS, Win11 Snipping Tool, etc.) the file's
+    modification time is the moment the recording was finalized, so
+    start = mtime - duration. Returns ISO 8601 UTC string with ms precision,
+    or None if the math would produce something nonsensical.
+    """
+    if fps <= 0 or total_frames <= 0:
+        return None
+    duration_sec = total_frames / fps
+    try:
+        mtime = os.path.getmtime(video_path)
+    except OSError:
+        return None
+    start_unix = mtime - duration_sec
+    if start_unix <= 0:
+        return None
+    dt = datetime.fromtimestamp(start_unix, tz=timezone.utc)
+    iso = dt.isoformat(timespec="milliseconds")
+    return iso.replace("+00:00", "Z")
+
+
 def run_ocr(args):
     cap = cv2.VideoCapture(str(args.video))
     if not cap.isOpened():
@@ -93,10 +117,20 @@ def run_ocr(args):
     )
     print(f"Clock region: x={x}, y={y}, w={w}, h={h}", file=sys.stderr)
 
+    inferred_start = infer_start_time_iso(args.video, fps, total_frames)
+    if inferred_start:
+        print(f"Inferred recording start: {inferred_start}", file=sys.stderr)
+    else:
+        print("Could not infer recording start time from file metadata.", file=sys.stderr)
+
     if args.debug_dir:
         args.debug_dir.mkdir(parents=True, exist_ok=True)
 
     out_handle = open(args.output, "w", newline="") if args.output else sys.stdout
+    if inferred_start:
+        # Embed the start time as a comment header so build_durations.py can
+        # pick it up automatically without the user having to pass it again.
+        out_handle.write(f"# anchor_time={inferred_start}\n")
     writer = csv.writer(out_handle)
     writer.writerow(["video_ms", "ingame"])
 

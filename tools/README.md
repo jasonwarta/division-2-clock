@@ -26,6 +26,7 @@ python tools/ocr_clock.py recording.mp4 --bbox 1820,40,80,30 --output minutes.cs
 The CSV looks like:
 
 ```
+# anchor_time=2026-04-30T18:13:42.123Z
 video_ms,ingame
 0,14:41
 3157,14:42
@@ -34,6 +35,8 @@ video_ms,ingame
 ```
 
 `video_ms` is real time elapsed since the start of the recording. Subtract adjacent rows to get the duration of each in-game minute.
+
+The `# anchor_time=...` header is auto-derived from the file's modification time minus its video duration (so for most screen recorders it's the moment you hit Record). `build_durations.py` reads this automatically.
 
 ### Useful flags
 
@@ -51,9 +54,11 @@ Run `build_durations.py` on the CSV to get a paste-ready JS array.
 Reads `minutes.csv` and emits an updated `HOUR_DURATIONS` (and optionally `MINUTE_DURATIONS`) array suitable for pasting into `script.js`. Stdlib only, no install needed.
 
 ```
-python tools/build_durations.py minutes.csv                     # hour array
+python tools/build_durations.py minutes.csv                     # hour array + auto-anchor
 python tools/build_durations.py minutes.csv --minute            # also per-minute
 python tools/build_durations.py minutes.csv > new_arrays.js     # redirect
 ```
+
+If the CSV has an `# anchor_time=...` header (which `ocr_clock.py` writes by default), the script also emits a `DEFAULT_ANCHOR_MS` constant. Override with `--anchor-time '2026-04-30T18:13:42Z'` if you want a different anchor.
 
 Stats and a per-hour delta-vs-2021 chart go to stderr, so redirecting stdout gives you a clean JS file.
