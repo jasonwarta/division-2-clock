@@ -18,11 +18,11 @@ const START_CUM = [0];
 for (const d of HOUR_DURATIONS) START_CUM.push(START_CUM[START_CUM.length - 1] + d);
 
 // Auto-anchor: real-world Unix ms at the moment in-game was 00:00:00.
-// Derived from a 2.5-hour OCR session on 2026-04-30: at recording start
-// (2026-04-30T18:13:30.794Z) the in-game clock read 05:51, which back-fits
-// to a cycle origin of 2026-04-30T17:59:53.244Z. The cycle is not exactly
-// aligned to UTC midnight (off by ~6.8s), so we use the derived anchor.
-const ANCHOR_MS = 1777571993244;
+// Derived from a 2.5-hour OCR session on 2026-04-30. Anchored on the first
+// observed minute-transition (05:51 -> 05:52 at video_ms=2633) rather than
+// on the recording's first frame, since the first frame fell mid-minute and
+// its anchor implication was uncertain by up to 60 real seconds.
+const ANCHOR_MS = 1777571993160;
 
 function realToIngame(elapsedRealSec) {
   const e = ((elapsedRealSec % CYCLE_SECONDS) + CYCLE_SECONDS) % CYCLE_SECONDS;

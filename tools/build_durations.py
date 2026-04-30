@@ -291,13 +291,17 @@ def main():
         if embedded_anchor_time and not args.anchor_time:
             print(f"Using embedded anchor_time from CSV: {embedded_anchor_time}", file=sys.stderr)
         recording_start_ms = parse_iso_to_utc_ms(anchor_time)
-        # Use new durations where available, falling back to 2021 values for
-        # uncovered hours so the cumulative offset is still computable.
         merged_durations = [
             round(d) if d is not None else CURRENT_HOUR_DURATIONS[h]
             for h, (d, _) in enumerate(hour_summary)
         ]
-        ms, h, m = rows[0]
+        # Use the SECOND row (the first observed time-change), not the first.
+        # The first row was captured at video_ms=0 mid-way through some minute,
+        # so its anchor implication is uncertain by up to one minute. The second
+        # row's ms is the moment OCR first detected a *different* time, which is
+        # closer to a true minute-transition boundary.
+        anchor_row_idx = 1 if len(rows) >= 2 else 0
+        ms, h, m = rows[anchor_row_idx]
         wall_clock_ms = recording_start_ms + ms
         ingame_offset_sec = ingame_to_real_seconds(h, m, merged_durations)
         anchor_ms = wall_clock_ms - ingame_offset_sec * 1000
