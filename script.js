@@ -16,10 +16,13 @@ const START_CUM_MS = [0];
 for (const d of HOUR_DURATIONS_MS) START_CUM_MS.push(START_CUM_MS[START_CUM_MS.length - 1] + d);
 
 // Auto-anchor: real-world Unix ms at the moment in-game was 00:00:00.
-// Derived from the OCR session, with a +5400ms calibration adjustment from a
-// user observation that the page was running 3 in-game min ahead at hour 22
-// (where 1 in-game min = 1.8 real sec, so 3 min = 5.4 real sec).
-const ANCHOR_MS = 1777571998560;
+// Derived from the OCR session and calibrated against a user observation:
+// at 22:32 UTC the page showed ~18:13 while in-game showed 18:17 (4 in-game
+// min behind). At hour 18 (294.5s/hour), 4 in-game min = 19.636 real sec,
+// so the anchor needs to be 19636ms EARLIER than the OCR-derived value.
+//   OCR-derived (from row[1] of minutes.csv): 1777571993160
+//   Calibration shift: -19636 ms
+const ANCHOR_MS = 1777571973524;
 
 function realToIngame(elapsedRealMs) {
   const e = ((elapsedRealMs % CYCLE_MS) + CYCLE_MS) % CYCLE_MS;
