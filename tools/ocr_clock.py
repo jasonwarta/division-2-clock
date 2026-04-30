@@ -141,7 +141,16 @@ def run_ocr(args):
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    x, y, w, h = args.bbox
+    if args.bbox is None:
+        # Default to the full frame -- useful when the recording was already
+        # cropped to just the clock area.
+        full_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        full_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        bbox = (0, 0, full_w, full_h)
+        print(f"No --bbox given; defaulting to full frame {full_w}x{full_h}.", file=sys.stderr)
+    else:
+        bbox = args.bbox
+    x, y, w, h = bbox
     print(
         f"Video: {fps:.2f} fps, {total_frames} frames, ~{total_frames / fps / 60:.1f} min",
         file=sys.stderr,
@@ -271,9 +280,7 @@ def main():
         pick_bbox(args.video)
         return
 
-    if args.bbox is None:
-        ap.error("--bbox is required (or use --pick-bbox to find one interactively)")
-
+    # If --bbox is omitted, run_ocr() defaults to the full frame.
     run_ocr(args)
 
 
