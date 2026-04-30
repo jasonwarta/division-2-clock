@@ -15,8 +15,6 @@ const CYCLE_SECONDS = HOUR_DURATIONS.reduce((a, b) => a + b, 0); // 4319
 const START_CUM = [0];
 for (const d of HOUR_DURATIONS) START_CUM.push(START_CUM[START_CUM.length - 1] + d);
 
-const ANCHOR_KEY = "div2clock.anchorMs";
-
 // Auto-anchor: real-world Unix ms at the moment in-game was 00:00:00.
 // Working hypothesis: D2's day/night cycle is anchored to UTC midnight (the
 // game must use a server-time-derived formula since all shards see the same
@@ -25,25 +23,7 @@ const ANCHOR_KEY = "div2clock.anchorMs";
 // the 2021 hour-duration data. To be replaced with a precise anchor from OCR.
 //
 // Any UTC midnight works since the cycle repeats; using today's for clarity.
-// Set to null to disable and force manual sync.
-const DEFAULT_ANCHOR_MS = Date.parse("2026-04-30T00:00:00Z");
-
-function loadAnchor() {
-  const raw = localStorage.getItem(ANCHOR_KEY);
-  if (raw) {
-    const n = Number(raw);
-    if (Number.isFinite(n)) return n;
-  }
-  return DEFAULT_ANCHOR_MS;
-}
-
-function saveAnchor(ms) {
-  localStorage.setItem(ANCHOR_KEY, String(ms));
-}
-
-function clearAnchor() {
-  localStorage.removeItem(ANCHOR_KEY);
-}
+const ANCHOR_MS = Date.parse("2026-04-30T00:00:00Z");
 
 function realToIngame(elapsedRealSec) {
   const e = ((elapsedRealSec % CYCLE_SECONDS) + CYCLE_SECONDS) % CYCLE_SECONDS;
@@ -61,19 +41,6 @@ function realToIngame(elapsedRealSec) {
     fractionOfDay: e / CYCLE_SECONDS,
     fractionOfHour: fraction,
   };
-}
-
-function ingameToReal(hour, minute) {
-  return START_CUM[hour] + (minute / 60) * HOUR_DURATIONS[hour];
-}
-
-function parseHHMM(s) {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
-  return { hour: h, minute: min };
 }
 
 function pad(n, w) {
@@ -114,10 +81,10 @@ function formatOffset(seconds) {
 
 // Real-time when in-game hour h:00 starts, for the entry at index i in a timeline
 // that begins at currentHour (so i=0 -> current hour, in the current cycle).
-function timelineHourStart(i, currentHour, anchorMs, nowMs) {
-  const elapsedSec = (nowMs - anchorMs) / 1000;
+function timelineHourStart(i, currentHour, nowMs) {
+  const elapsedSec = (nowMs - ANCHOR_MS) / 1000;
   const cyclesPassed = Math.floor(elapsedSec / CYCLE_SECONDS);
-  const cycleStartMs = anchorMs + cyclesPassed * CYCLE_SECONDS * 1000;
+  const cycleStartMs = ANCHOR_MS + cyclesPassed * CYCLE_SECONDS * 1000;
   const cycleOffset = Math.floor((currentHour + i) / 24);
   const h = (currentHour + i) % 24;
   return new Date(cycleStartMs + (cycleOffset * CYCLE_SECONDS + START_CUM[h]) * 1000);
@@ -126,11 +93,6 @@ function timelineHourStart(i, currentHour, anchorMs, nowMs) {
 const els = {
   clock: document.getElementById("clock"),
   phase: document.getElementById("phase"),
-  syncMidnight: document.getElementById("sync-midnight"),
-  syncCustom: document.getElementById("sync-custom"),
-  syncTime: document.getElementById("sync-time"),
-  clearAnchor: document.getElementById("clear-anchor"),
-  syncHint: document.getElementById("sync-hint"),
   timeline: document.getElementById("timeline"),
   timelineRows: document.getElementById("timeline-rows"),
   timelineMarker: document.querySelector(".timeline-marker"),
@@ -140,26 +102,24 @@ const els = {
 const ROW_HEIGHT_PX = 60;
 let prevCurrentHour = null;
 
-function renderTimeline(anchorMs, nowMs, currentHour) {
+function renderTimeline(nowMs, currentHour) {
   const rows = [];
   for (let i = 0; i < 24; i++) {
     const h = (currentHour + i) % 24;
     const isCurrent = i === 0;
-    let metaHtml = "";
-    if (anchorMs != null) {
-      const when = timelineHourStart(i, currentHour, anchorMs, nowMs);
-      const deltaSec = Math.abs((when.getTime() - nowMs) / 1000);
-      metaHtml =
-        '<div class="timeline-meta">' +
-        format12h(when) +
-        " &middot; " +
-        formatOffset(deltaSec) +
-        "</div>";
-    }
+    const when = timelineHourStart(i, currentHour, nowMs);
+    const deltaSec = Math.abs((when.getTime() - nowMs) / 1000);
+    const metaHtml =
+      '<div class="timeline-meta">' +
+      format12h(when) +
+      " &middot; " +
+      formatOffset(deltaSec) +
+      "</div>";
     rows.push(
       '<div class="timeline-row' +
         (isCurrent ? " current" : "") +
         '">' +
+        '<div class="timeline-tick"></div>' +
         '<div class="timeline-hour">' +
         pad(h) +
         ":00</div>" +
@@ -174,14 +134,6 @@ function renderTimeline(anchorMs, nowMs, currentHour) {
 // current hour starts at the marker line and slides up past it, fading at
 // the top, while the next hour rises into its place by the end of the hour.
 function updateTimelineSlide(t) {
-  if (!t) {
-    els.timelineRows.style.transform = "";
-    els.timelineMarker.hidden = true;
-    prevCurrentHour = null;
-    return;
-  }
-  els.timelineMarker.hidden = false;
-
   const offsetPx = t.fractionOfHour * ROW_HEIGHT_PX;
   const transform = "translateY(" + (-offsetPx).toFixed(3) + "px)";
 
@@ -200,59 +152,16 @@ function updateTimelineSlide(t) {
 }
 
 function tick() {
-  const anchorMs = loadAnchor();
   const nowMs = Date.now();
-  let currentHour = 0;
-  let t = null;
+  const elapsed = (nowMs - ANCHOR_MS) / 1000;
+  const t = realToIngame(elapsed);
 
-  if (anchorMs == null) {
-    els.clock.textContent = "--:--:--";
-    els.clock.classList.remove("synced");
-    els.phase.textContent = "Not synced";
-    els.syncHint.style.display = "";
-  } else {
-    const elapsed = (nowMs - anchorMs) / 1000;
-    t = realToIngame(elapsed);
-    els.clock.textContent = formatIngame(t);
-    els.clock.classList.add("synced");
-    els.phase.textContent = phaseLabel(t.hour);
-    els.syncHint.style.display = "none";
-    currentHour = t.hour;
-  }
+  els.clock.textContent = formatIngame(t);
+  els.phase.textContent = phaseLabel(t.hour);
 
-  renderTimeline(anchorMs, nowMs, currentHour);
+  renderTimeline(nowMs, t.hour);
   updateTimelineSlide(t);
 }
-
-function setAnchorFromIngame(hour, minute) {
-  const offsetSec = ingameToReal(hour, minute);
-  const anchorMs = Date.now() - offsetSec * 1000;
-  saveAnchor(anchorMs);
-  tick();
-}
-
-els.syncMidnight.addEventListener("click", function () {
-  setAnchorFromIngame(0, 0);
-});
-
-els.syncCustom.addEventListener("click", function () {
-  const parsed = parseHHMM(els.syncTime.value);
-  if (!parsed) {
-    els.syncTime.focus();
-    els.syncTime.select();
-    return;
-  }
-  setAnchorFromIngame(parsed.hour, parsed.minute);
-});
-
-els.syncTime.addEventListener("keydown", function (e) {
-  if (e.key === "Enter") els.syncCustom.click();
-});
-
-els.clearAnchor.addEventListener("click", function () {
-  clearAnchor();
-  tick();
-});
 
 tick();
 setInterval(tick, 500);

@@ -48,15 +48,16 @@ h2 {
 
 .hero {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .clock-frame {
   display: inline-block;
-  border: 1.5px solid var(--text);
+  border: 1.5px solid var(--accent);
   border-radius: 6px;
   padding: 14px 28px;
   min-width: 220px;
+  box-shadow: 0 0 20px var(--accent-glow);
 }
 
 .clock {
@@ -65,12 +66,8 @@ h2 {
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-.clock.synced {
   color: var(--accent);
+  font-variant-numeric: tabular-nums;
   text-shadow: 0 0 16px var(--accent-glow);
 }
 
@@ -82,95 +79,18 @@ h2 {
   color: var(--text-dim);
 }
 
-.sync {
-  margin-bottom: 32px;
-  text-align: center;
-}
-
-.sync-custom {
-  margin-top: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-.hint {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin: 12px 0 0;
-  line-height: 1.5;
-}
-
-button {
-  background: var(--accent);
-  color: #1a0f06;
-  border: none;
-  border-radius: 4px;
-  padding: 8px 16px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.05s;
-  font-family: inherit;
-}
-
-button:hover { background: #ff8a3d; }
-button:active { transform: translateY(1px); }
-
-button.primary {
-  padding: 10px 20px;
-  font-size: 13px;
-}
-
-button.ghost {
-  background: transparent;
-  color: var(--text-dim);
-  border: 1px solid var(--border);
-  font-weight: 500;
-}
-
-button.ghost:hover {
-  color: var(--text);
-  border-color: var(--text-dim);
-  background: transparent;
-}
-
-input[type="text"] {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 13px;
-  width: 70px;
-  text-align: center;
-}
-
-input[type="text"]:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
 .timeline {
   position: relative;
   height: 720px;
   overflow: hidden;
-  padding-left: 16px;
-  border-left: 1px solid var(--border);
 }
 
-/* The padding-top offsets row 0 so its top aligns with the marker line
-   below the top fade; the transform then slides rows up past the marker. */
+/* padding-top sets where row 0 begins. Combined with row height (60px), row 0's
+   vertical center sits at padding-top + 30, which is where we anchor the marker
+   so "the top of the hour" lines up with the middle of the hour number. */
 #timeline-rows {
   position: relative;
-  padding-top: 40px;
+  padding-top: 30px;
   transition: transform 0.5s linear;
   will-change: transform;
 }
@@ -185,7 +105,7 @@ input[type="text"]:focus {
 
 .timeline-fade-top {
   top: 0;
-  height: 40px;
+  height: 30px;
   background: linear-gradient(to bottom, var(--bg) 0%, transparent 100%);
 }
 
@@ -197,26 +117,32 @@ input[type="text"]:focus {
 
 .timeline-marker {
   position: absolute;
-  left: -8px;
-  width: 16px;
+  left: -1px;
+  width: 22px;
   height: 2px;
-  top: 40px;
+  top: 60px;
+  margin-top: -1px;
   background: var(--accent);
   border-radius: 1px;
-  box-shadow: 0 0 8px var(--accent), 0 0 16px var(--accent-glow);
-  z-index: 2;
+  box-shadow: 0 0 8px var(--accent), 0 0 18px var(--accent-glow);
+  z-index: 3;
   pointer-events: none;
 }
 
-.timeline-marker[hidden] { display: none; }
-
 .timeline-row {
   height: 60px;
-  padding: 0;
-  position: relative;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  align-items: center;
+  border-left: 1px solid var(--border);
+  gap: 12px;
+  padding-right: 4px;
+}
+
+.timeline-tick {
+  width: 10px;
+  height: 1px;
+  background: var(--border);
+  flex-shrink: 0;
 }
 
 .timeline-hour {
@@ -236,7 +162,7 @@ input[type="text"]:focus {
 .timeline-meta {
   font-size: 12px;
   color: var(--text-dimmer);
-  margin-top: 2px;
+  margin-left: auto;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
