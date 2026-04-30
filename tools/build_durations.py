@@ -19,6 +19,7 @@ import csv
 import statistics
 import sys
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Current 2021 values from script.js, for delta reporting.
@@ -113,6 +114,34 @@ def emit_hour_array(hour_summary, file=sys.stdout):
     file.write("];\n")
 
 
+def ingame_to_real_seconds(hour, minute, hour_durations):
+    """Mirror of script.js ingameToReal()."""
+    cum = sum(hour_durations[:hour])
+    cum += (minute / 60) * hour_durations[hour]
+    return cum
+
+
+def parse_iso_to_utc_ms(iso):
+    """Accept '2026-04-30T12:00:00Z' or '2026-04-30T12:00:00+00:00' etc."""
+    s = iso.strip()
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        raise SystemExit(f"Could not parse --anchor-time: {iso!r}")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return int(dt.timestamp() * 1000)
+
+
+def emit_anchor(anchor_ms, recording_start_iso, observation, hour_durations, file=sys.stdout):
+    h, m, video_ms = observation
+    file.write("\n// Auto-anchor: Unix ms at the moment in-game was 00:00:00.\n")
+    file.write(f"// Derived from observation: at {recording_start_iso}+{video_ms}ms, in-game was {h:02d}:{m:02d}.\n")
+    file.write(f"const DEFAULT_ANCHOR_MS = {int(anchor_ms)};\n")
+
+
 def emit_minute_array(per_minute, file=sys.stdout):
     file.write("\n// Per-minute MINUTE_DURATIONS (real seconds, 3 decimals).\n")
     file.write("// null = no observation in this slot.\n")
@@ -185,6 +214,11 @@ def main():
         default=30.0,
         help="Reject adjacent-minute spans longer than this many seconds as outliers (default 30).",
     )
+    ap.add_argument(
+        "--anchor-time",
+        help="ISO 8601 wall-clock time corresponding to video_ms=0 (recording start). "
+        "If given, emits a DEFAULT_ANCHOR_MS constant computed from the first valid CSV row.",
+    )
     args = ap.parse_args()
 
     rows = parse_csv(args.csv_path)
@@ -198,6 +232,19 @@ def main():
     emit_hour_array(hour_summary)
     if args.minute:
         emit_minute_array(per_minute)
+    if args.anchor_time:
+        recording_start_ms = parse_iso_to_utc_ms(args.anchor_time)
+        # Use new durations where available, falling back to 2021 values for
+        # uncovered hours so the cumulative offset is still computable.
+        merged_durations = [
+            round(d) if d is not None else CURRENT_HOUR_DURATIONS[h]
+            for h, (d, _) in enumerate(hour_summary)
+        ]
+        ms, h, m = rows[0]
+        wall_clock_ms = recording_start_ms + ms
+        ingame_offset_sec = ingame_to_real_seconds(h, m, merged_durations)
+        anchor_ms = wall_clock_ms - ingame_offset_sec * 1000
+        emit_anchor(anchor_ms, args.anchor_time, (h, m, ms), merged_durations)
 
 
 if __name__ == "__main__":

@@ -17,11 +17,20 @@ for (const d of HOUR_DURATIONS) START_CUM.push(START_CUM[START_CUM.length - 1] +
 
 const ANCHOR_KEY = "div2clock.anchorMs";
 
+// Auto-anchor: real-world Unix ms at the moment in-game was 00:00:00.
+// Set to null to require the user to sync manually. When set, the page is
+// auto-synced for first-time visitors; user-set anchors in localStorage
+// override the default. To regenerate, run:
+//   python tools/build_durations.py minutes.csv --anchor-time '2026-04-30T12:00:00Z'
+const DEFAULT_ANCHOR_MS = null;
+
 function loadAnchor() {
   const raw = localStorage.getItem(ANCHOR_KEY);
-  if (!raw) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
+  if (raw) {
+    const n = Number(raw);
+    if (Number.isFinite(n)) return n;
+  }
+  return DEFAULT_ANCHOR_MS;
 }
 
 function saveAnchor(ms) {
