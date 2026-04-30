@@ -120,11 +120,10 @@ const els = {
   syncHint: document.getElementById("sync-hint"),
   timeline: document.getElementById("timeline"),
   timelineRows: document.getElementById("timeline-rows"),
-  timeMarker: document.getElementById("time-marker"),
 };
 
-// Y offset of the per-row tick mark inside its row (matches CSS top:14px on ::before).
-const TICK_Y_OFFSET = 14;
+// Must match .timeline-row height in style.css.
+const ROW_HEIGHT_PX = 60;
 let prevCurrentHour = null;
 
 function renderTimeline(anchorMs, nowMs, currentHour) {
@@ -157,30 +156,29 @@ function renderTimeline(anchorMs, nowMs, currentHour) {
   els.timelineRows.innerHTML = rows.join("");
 }
 
-function updateMarker(t) {
+// Slide the timeline rows upward as the in-game minute progresses, so the
+// current hour fades out the top of the viewport over the course of the hour
+// and the next hour scrolls into the visible area from below.
+function updateTimelineSlide(t) {
   if (!t) {
-    els.timeMarker.hidden = true;
+    els.timelineRows.style.transform = "";
     prevCurrentHour = null;
     return;
   }
-  const rows = els.timelineRows.children;
-  if (rows.length < 2) return;
-  els.timeMarker.hidden = false;
 
-  const row0Top = rows[0].offsetTop;
-  const row1Top = rows[1].offsetTop;
-  const hourHeight = row1Top - row0Top;
-  const top = row0Top + TICK_Y_OFFSET + t.fractionOfHour * hourHeight;
+  const offsetPx = t.fractionOfHour * ROW_HEIGHT_PX;
+  const transform = "translateY(" + (-offsetPx).toFixed(3) + "px)";
 
   if (prevCurrentHour !== t.hour) {
-    // First frame, or hour rolled over (timeline rotates). Snap without
-    // animating so the marker doesn't visually fly across a row.
-    els.timeMarker.style.transition = "none";
-    els.timeMarker.style.top = top + "px";
-    void els.timeMarker.offsetHeight; // force reflow
-    els.timeMarker.style.transition = "";
+    // Timeline just re-rendered with a new currentHour at row 0. The transform
+    // would otherwise animate from ~-60px back toward 0, looking like the list
+    // jumps backward. Snap without transition.
+    els.timelineRows.style.transition = "none";
+    els.timelineRows.style.transform = transform;
+    void els.timelineRows.offsetHeight;
+    els.timelineRows.style.transition = "";
   } else {
-    els.timeMarker.style.top = top + "px";
+    els.timelineRows.style.transform = transform;
   }
   prevCurrentHour = t.hour;
 }
@@ -207,7 +205,7 @@ function tick() {
   }
 
   renderTimeline(anchorMs, nowMs, currentHour);
-  updateMarker(t);
+  updateTimelineSlide(t);
 }
 
 function setAnchorFromIngame(hour, minute) {

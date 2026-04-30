@@ -160,42 +160,45 @@ input[type="text"]:focus {
 
 .timeline {
   position: relative;
+  height: 480px;
+  overflow: hidden;
   padding-left: 16px;
   border-left: 1px solid var(--border);
 }
 
 #timeline-rows {
   position: relative;
+  transition: transform 0.5s linear;
+  will-change: transform;
 }
 
-#time-marker {
+.timeline-fade {
   position: absolute;
-  left: -8px;
-  width: 16px;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 1px;
-  transition: top 0.5s linear;
+  left: 0;
+  right: 0;
   pointer-events: none;
-  z-index: 2;
-  box-shadow: 0 0 10px var(--accent-glow);
+  z-index: 1;
 }
 
-#time-marker[hidden] { display: none; }
+.timeline-fade-top {
+  top: 0;
+  height: 60px;
+  background: linear-gradient(to bottom, var(--bg) 0%, var(--bg) 30%, transparent 100%);
+}
+
+.timeline-fade-bottom {
+  bottom: 0;
+  height: 100px;
+  background: linear-gradient(to top, var(--bg) 0%, var(--bg) 50%, transparent 100%);
+}
 
 .timeline-row {
-  padding: 10px 0 14px;
+  height: 60px;
+  padding: 0;
   position: relative;
-}
-
-.timeline-row::before {
-  content: "";
-  position: absolute;
-  left: -20px;
-  top: 14px;
-  width: 8px;
-  height: 1px;
-  background: var(--border);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .timeline-hour {
