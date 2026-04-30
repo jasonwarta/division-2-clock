@@ -65,34 +65,59 @@ def parse_csv(path):
 
 
 def compute_minute_durations(rows, max_sane_duration_sec):
-    """For each adjacent pair separated by exactly 1 in-game minute, record
-    the elapsed ms against the earlier (h, m) slot. Returns the dict of
-    observations plus the counts that were rejected.
+    """Record the duration of each observed in-game minute.
+
+    A minute's duration is only counted when *both* the transition INTO it
+    and the transition OUT of it are present in the data (each as a clean
+    1-minute step from the previous row). This rejects:
+
+      - The first row of the recording (we don't know when that minute
+        started -- it was already on screen when capture began).
+      - Any row where the previous row jumped by more than 1 minute, e.g.
+        because the clock was hidden behind a closed menu, the player was
+        AFK-kicked and reconnected, or OCR briefly missed transitions.
+
+    For those rows we know neither when the displayed minute started nor
+    how long it had already been visible, so attributing any duration to
+    that minute slot would be inaccurate. We wait for the next clean
+    transition out and start recording from there.
     """
     durations = defaultdict(list)
     skipped_gaps = 0
     skipped_outliers = 0
+    skipped_post_gap_starts = 0
 
-    for i in range(len(rows) - 1):
-        ms1, h1, m1 = rows[i]
-        ms2, h2, m2 = rows[i + 1]
+    def minute_diff(prev, curr):
+        d = (curr[1] * 60 + curr[2]) - (prev[1] * 60 + prev[2])
+        if d < 0:
+            d += 1440
+        return d
 
-        minute_diff = (h2 * 60 + m2) - (h1 * 60 + m1)
-        if minute_diff < 0:
-            minute_diff += 1440  # wrapped through midnight
+    # Iterate over each row that has both a predecessor and a successor.
+    # Row[i] represents some minute slot; we record its duration only if:
+    #   1. transition (i-1 -> i) was a clean 1-minute step (so we observed
+    #      the moment it started), AND
+    #   2. transition (i -> i+1) is a clean 1-minute step (so we observed
+    #      the moment it ended).
+    for i in range(1, len(rows) - 1):
+        prev, curr, nxt = rows[i - 1], rows[i], rows[i + 1]
 
-        if minute_diff != 1:
+        if minute_diff(prev, curr) != 1:
+            skipped_post_gap_starts += 1
+            continue
+
+        if minute_diff(curr, nxt) != 1:
             skipped_gaps += 1
             continue
 
-        duration_ms = ms2 - ms1
+        duration_ms = nxt[0] - curr[0]
         if duration_ms <= 0 or duration_ms > max_sane_duration_sec * 1000:
             skipped_outliers += 1
             continue
 
-        durations[(h1, m1)].append(duration_ms)
+        durations[(curr[1], curr[2])].append(duration_ms)
 
-    return durations, skipped_gaps, skipped_outliers
+    return durations, skipped_gaps, skipped_outliers, skipped_post_gap_starts
 
 
 def hour_summaries(per_minute):
@@ -178,7 +203,10 @@ def emit_minute_array(per_minute, file=sys.stdout):
     file.write("];\n")
 
 
-def emit_stats(rows, per_minute, hour_summary, skipped_gaps, skipped_outliers, file=sys.stderr):
+def emit_stats(
+    rows, per_minute, hour_summary, skipped_gaps, skipped_outliers, skipped_post_gap_starts,
+    file=sys.stderr,
+):
     bar = "=" * 64
     total_obs = sum(len(v) for v in per_minute.values())
     minutes_covered = len(per_minute)
@@ -191,9 +219,10 @@ def emit_stats(rows, per_minute, hour_summary, skipped_gaps, skipped_outliers, f
 
     print(bar, file=file)
     print(f"Rows read:                {len(rows)}", file=file)
-    print(f"Useful adjacent samples:  {total_obs}", file=file)
-    print(f"Gaps skipped:             {skipped_gaps}", file=file)
-    print(f"Outliers skipped:         {skipped_outliers}", file=file)
+    print(f"Reliable durations:       {total_obs}", file=file)
+    print(f"Skipped (gap before row): {skipped_post_gap_starts}", file=file)
+    print(f"Skipped (gap after row):  {skipped_gaps}", file=file)
+    print(f"Skipped (outliers):       {skipped_outliers}", file=file)
     print(f"Minutes covered:          {minutes_covered}/1440", file=file)
     print(f"Hours with any coverage:  {hours_covered}/24", file=file)
     print(
@@ -245,10 +274,14 @@ def main():
     if not rows:
         sys.exit("No usable rows in CSV.")
 
-    per_minute, skipped_gaps, skipped_outliers = compute_minute_durations(rows, args.max_duration)
+    per_minute, skipped_gaps, skipped_outliers, skipped_post_gap_starts = compute_minute_durations(
+        rows, args.max_duration
+    )
     hour_summary = hour_summaries(per_minute)
 
-    emit_stats(rows, per_minute, hour_summary, skipped_gaps, skipped_outliers)
+    emit_stats(
+        rows, per_minute, hour_summary, skipped_gaps, skipped_outliers, skipped_post_gap_starts
+    )
     emit_hour_array(hour_summary)
     if args.minute:
         emit_minute_array(per_minute)
