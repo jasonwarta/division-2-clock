@@ -164,6 +164,25 @@ input[type="text"]:focus {
   border-left: 1px solid var(--border);
 }
 
+#timeline-rows {
+  position: relative;
+}
+
+#time-marker {
+  position: absolute;
+  left: -8px;
+  width: 16px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  transition: top 0.5s linear;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+#time-marker[hidden] { display: none; }
+
 .timeline-row {
   padding: 10px 0 14px;
   position: relative;
@@ -177,14 +196,6 @@ input[type="text"]:focus {
   width: 8px;
   height: 1px;
   background: var(--border);
-}
-
-.timeline-row.current::before {
-  background: var(--accent);
-  width: 12px;
-  left: -24px;
-  height: 2px;
-  top: 13px;
 }
 
 .timeline-hour {

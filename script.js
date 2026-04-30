@@ -41,7 +41,13 @@ function realToIngame(elapsedRealSec) {
   const ingameSecondsTotal = Math.floor(fraction * 3600);
   const minute = Math.floor(ingameSecondsTotal / 60);
   const second = ingameSecondsTotal % 60;
-  return { hour: h, minute: minute, second: second, fractionOfDay: e / CYCLE_SECONDS };
+  return {
+    hour: h,
+    minute: minute,
+    second: second,
+    fractionOfDay: e / CYCLE_SECONDS,
+    fractionOfHour: fraction,
+  };
 }
 
 function ingameToReal(hour, minute) {
@@ -113,7 +119,13 @@ const els = {
   clearAnchor: document.getElementById("clear-anchor"),
   syncHint: document.getElementById("sync-hint"),
   timeline: document.getElementById("timeline"),
+  timelineRows: document.getElementById("timeline-rows"),
+  timeMarker: document.getElementById("time-marker"),
 };
+
+// Y offset of the per-row tick mark inside its row (matches CSS top:14px on ::before).
+const TICK_Y_OFFSET = 14;
+let prevCurrentHour = null;
 
 function renderTimeline(anchorMs, nowMs, currentHour) {
   const rows = [];
@@ -142,23 +154,51 @@ function renderTimeline(anchorMs, nowMs, currentHour) {
         "</div>"
     );
   }
-  els.timeline.innerHTML = rows.join("");
+  els.timelineRows.innerHTML = rows.join("");
+}
+
+function updateMarker(t) {
+  if (!t) {
+    els.timeMarker.hidden = true;
+    prevCurrentHour = null;
+    return;
+  }
+  const rows = els.timelineRows.children;
+  if (rows.length < 2) return;
+  els.timeMarker.hidden = false;
+
+  const row0Top = rows[0].offsetTop;
+  const row1Top = rows[1].offsetTop;
+  const hourHeight = row1Top - row0Top;
+  const top = row0Top + TICK_Y_OFFSET + t.fractionOfHour * hourHeight;
+
+  if (prevCurrentHour !== t.hour) {
+    // First frame, or hour rolled over (timeline rotates). Snap without
+    // animating so the marker doesn't visually fly across a row.
+    els.timeMarker.style.transition = "none";
+    els.timeMarker.style.top = top + "px";
+    void els.timeMarker.offsetHeight; // force reflow
+    els.timeMarker.style.transition = "";
+  } else {
+    els.timeMarker.style.top = top + "px";
+  }
+  prevCurrentHour = t.hour;
 }
 
 function tick() {
   const anchorMs = loadAnchor();
   const nowMs = Date.now();
   let currentHour = 0;
+  let t = null;
 
   if (anchorMs == null) {
     els.clock.textContent = "--:--:--";
     els.clock.classList.remove("synced");
     els.phase.textContent = "Not synced";
     els.syncHint.style.display = "";
-    currentHour = 0;
   } else {
     const elapsed = (nowMs - anchorMs) / 1000;
-    const t = realToIngame(elapsed);
+    t = realToIngame(elapsed);
     els.clock.textContent = formatIngame(t);
     els.clock.classList.add("synced");
     els.phase.textContent = phaseLabel(t.hour);
@@ -167,6 +207,7 @@ function tick() {
   }
 
   renderTimeline(anchorMs, nowMs, currentHour);
+  updateMarker(t);
 }
 
 function setAnchorFromIngame(hour, minute) {
