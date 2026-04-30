@@ -80,16 +80,48 @@ def pick_bbox(video_path):
     print(f"--bbox {x},{y},{w},{h}")
 
 
+# Win11 Snipping Tool's in-progress placeholder file is named with the recording
+# start time in UTC at sub-second precision -- e.g. "20260430-1813-30.7945725.mp4".
+# The placeholder typically vanishes when the recording is finalized, so we don't
+# scan for it; but if the user copies/renames the final file using this pattern
+# we recognize it.
+SNIPPING_TOOL_NAME_RE = re.compile(r"^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})-(\d+(?:\.\d+)?)\.mp4$")
+
+
+def parse_snipping_tool_filename(name):
+    """If 'name' matches the YYYYMMDD-HHMM-SS.SSSSSSS.mp4 pattern, return a
+    timezone-aware UTC datetime. Otherwise None."""
+    m = SNIPPING_TOOL_NAME_RE.match(name)
+    if not m:
+        return None
+    y, mo, d, h, mi, s_str = m.groups()
+    try:
+        sec_f = float(s_str)
+        sec_int = int(sec_f)
+        usec = int(round((sec_f - sec_int) * 1_000_000))
+        return datetime(int(y), int(mo), int(d), int(h), int(mi), sec_int, usec, tzinfo=timezone.utc)
+    except (ValueError, OverflowError):
+        return None
+
+
 def infer_start_time_iso(video_path, fps, total_frames):
     """Infer wall-clock time when frame 0 was recorded.
 
-    For most screen recorders (OBS, Win11 Snipping Tool, etc.) the file's
-    modification time is the moment the recording was finalized, so
-    start = mtime - duration. Returns ISO 8601 UTC string with ms precision,
-    or None if the math would produce something nonsensical.
+    Preference order:
+      1. The video's own filename, if it matches Snipping Tool's pattern.
+      2. mtime - duration (fallback).
+
+    Returns ISO 8601 UTC string with ms precision, or None.
     """
     if fps <= 0 or total_frames <= 0:
         return None
+
+    # The video file may already be named in Snipping Tool's format if the user
+    # renamed it that way or copied the placeholder file out before stopping.
+    name_match = parse_snipping_tool_filename(Path(video_path).name)
+    if name_match is not None:
+        return name_match.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
     duration_sec = total_frames / fps
     try:
         mtime = os.path.getmtime(video_path)
@@ -99,8 +131,7 @@ def infer_start_time_iso(video_path, fps, total_frames):
     if start_unix <= 0:
         return None
     dt = datetime.fromtimestamp(start_unix, tz=timezone.utc)
-    iso = dt.isoformat(timespec="milliseconds")
-    return iso.replace("+00:00", "Z")
+    return dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def run_ocr(args):
