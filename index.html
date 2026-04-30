@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Division 2 Clock - Real time to ingame time</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>The Division 2</h1>
+    <h2>Real time to ingame time</h2>
+  </header>
+
+  <section class="hero">
+    <div class="clock-frame">
+      <div id="clock" class="clock">--:--:--</div>
+    </div>
+    <div id="phase" class="phase">Not synced</div>
+  </section>
+
+  <section class="sync">
+    <button id="sync-midnight" class="primary">Sync to 00:00 now</button>
+    <div class="sync-custom">
+      <span>or sync to</span>
+      <input type="text" id="sync-time" placeholder="HH:MM" inputmode="numeric" maxlength="5" autocomplete="off">
+      <button id="sync-custom">Set</button>
+      <button id="clear-anchor" class="ghost">Clear</button>
+    </div>
+    <p class="hint" id="sync-hint">The clock cannot tell where in the cycle you are without a reference point. Click Sync the moment you see a known in-game time on screen.</p>
+  </section>
+
+  <section class="timeline" id="timeline" aria-label="Upcoming in-game hours"></section>
+
+  <footer>
+    <p>The Division 2 day/night cycle runs 4319 real seconds (about 72 minutes), but in-game hours are not equal length. Source data timed by hand from captured footage, 2021-06-14.</p>
+    <p>Source data: <a href="https://www.reddit.com/r/thedivision/comments/o0a3x0/the_craziness_that_is_division_2s_ingame_hours/" target="_blank" rel="noopener">/r/thedivision &mdash; the craziness that is Division 2&rsquo;s in-game hours</a></p>
+    <p>Source code at <a href="https://github.com/jasonwarta/division-2-clock">github.com/jasonwarta/division-2-clock</a></p>
+  </footer>
+</main>
+<script src="script.js"></script>
+</body>
+</html>
