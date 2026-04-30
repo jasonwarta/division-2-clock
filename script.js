@@ -18,11 +18,15 @@ for (const d of HOUR_DURATIONS) START_CUM.push(START_CUM[START_CUM.length - 1] +
 const ANCHOR_KEY = "div2clock.anchorMs";
 
 // Auto-anchor: real-world Unix ms at the moment in-game was 00:00:00.
-// Set to null to require the user to sync manually. When set, the page is
-// auto-synced for first-time visitors; user-set anchors in localStorage
-// override the default. To regenerate, run:
-//   python tools/build_durations.py minutes.csv --anchor-time '2026-04-30T12:00:00Z'
-const DEFAULT_ANCHOR_MS = null;
+// Working hypothesis: D2's day/night cycle is anchored to UTC midnight (the
+// game must use a server-time-derived formula since all shards see the same
+// in-game time). Validation 2026-04-30: at 10:59 UTC the page predicted
+// 04:54, observed in-game ~05:00 -- 6 min discrepancy attributed to noise in
+// the 2021 hour-duration data. To be replaced with a precise anchor from OCR.
+//
+// Any UTC midnight works since the cycle repeats; using today's for clarity.
+// Set to null to disable and force manual sync.
+const DEFAULT_ANCHOR_MS = Date.parse("2026-04-30T00:00:00Z");
 
 function loadAnchor() {
   const raw = localStorage.getItem(ANCHOR_KEY);
