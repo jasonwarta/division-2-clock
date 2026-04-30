@@ -120,6 +120,7 @@ const els = {
   syncHint: document.getElementById("sync-hint"),
   timeline: document.getElementById("timeline"),
   timelineRows: document.getElementById("timeline-rows"),
+  timelineMarker: document.querySelector(".timeline-marker"),
 };
 
 // Must match .timeline-row height in style.css.
@@ -157,14 +158,16 @@ function renderTimeline(anchorMs, nowMs, currentHour) {
 }
 
 // Slide the timeline rows upward as the in-game minute progresses, so the
-// current hour fades out the top of the viewport over the course of the hour
-// and the next hour scrolls into the visible area from below.
+// current hour starts at the marker line and slides up past it, fading at
+// the top, while the next hour rises into its place by the end of the hour.
 function updateTimelineSlide(t) {
   if (!t) {
     els.timelineRows.style.transform = "";
+    els.timelineMarker.hidden = true;
     prevCurrentHour = null;
     return;
   }
+  els.timelineMarker.hidden = false;
 
   const offsetPx = t.fractionOfHour * ROW_HEIGHT_PX;
   const transform = "translateY(" + (-offsetPx).toFixed(3) + "px)";
