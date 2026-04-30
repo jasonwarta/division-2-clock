@@ -1,11 +1,13 @@
 // Real seconds per in-game hour, indexed 0..23.
-// Source: third dataset from "210614 ingame time" (timed against captured footage,
-// noted as the most accurate of the three runs in the spreadsheet).
-// See https://www.reddit.com/r/thedivision/comments/o0a3x0/
+// Source: OCR pass over a 2.5-hour screen recording (2026-04-30) covering ~2
+// full cycles, averaged across 30+ observations per hour. Each value is
+// within ~6s of the 2021 dataset, confirming the cycle structure was right;
+// these new values just have ms-precision instead of +-2-3 sec hand-timing.
+// See tools/ocr_clock.py and tools/build_durations.py for the pipeline.
 const HOUR_DURATIONS = [
-  135, 132, 131, 136, 144, 162, 218, 276,
-  311, 281, 178, 139, 128, 125, 130, 147,
-  205, 321, 291, 244, 150, 116, 108, 111,
+  135, 131, 132, 136, 145, 163, 222, 275,
+  315, 275, 175, 139, 127, 125, 131, 149,
+  210, 324, 295, 238, 148, 115, 108, 111,
 ];
 
 const CYCLE_SECONDS = HOUR_DURATIONS.reduce((a, b) => a + b, 0); // 4319
@@ -16,14 +18,11 @@ const START_CUM = [0];
 for (const d of HOUR_DURATIONS) START_CUM.push(START_CUM[START_CUM.length - 1] + d);
 
 // Auto-anchor: real-world Unix ms at the moment in-game was 00:00:00.
-// Working hypothesis: D2's day/night cycle is anchored to UTC midnight (the
-// game must use a server-time-derived formula since all shards see the same
-// in-game time). Validation 2026-04-30: at 10:59 UTC the page predicted
-// 04:54, observed in-game ~05:00 -- 6 min discrepancy attributed to noise in
-// the 2021 hour-duration data. To be replaced with a precise anchor from OCR.
-//
-// Any UTC midnight works since the cycle repeats; using today's for clarity.
-const ANCHOR_MS = Date.parse("2026-04-30T00:00:00Z");
+// Derived from a 2.5-hour OCR session on 2026-04-30: at recording start
+// (2026-04-30T18:13:30.794Z) the in-game clock read 05:51, which back-fits
+// to a cycle origin of 2026-04-30T17:59:53.244Z. The cycle is not exactly
+// aligned to UTC midnight (off by ~6.8s), so we use the derived anchor.
+const ANCHOR_MS = 1777571993244;
 
 function realToIngame(elapsedRealSec) {
   const e = ((elapsedRealSec % CYCLE_SECONDS) + CYCLE_SECONDS) % CYCLE_SECONDS;
