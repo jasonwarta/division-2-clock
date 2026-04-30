@@ -44,4 +44,16 @@ video_ms,ingame
 
 ### After extraction
 
-Once you have a clean `minutes.csv`, hand it to me and I'll regenerate `HOUR_DURATIONS` (or upgrade to per-minute `MINUTE_DURATIONS`) in `script.js`.
+Run `build_durations.py` on the CSV to get a paste-ready JS array.
+
+## build_durations.py
+
+Reads `minutes.csv` and emits an updated `HOUR_DURATIONS` (and optionally `MINUTE_DURATIONS`) array suitable for pasting into `script.js`. Stdlib only, no install needed.
+
+```
+python tools/build_durations.py minutes.csv                     # hour array
+python tools/build_durations.py minutes.csv --minute            # also per-minute
+python tools/build_durations.py minutes.csv > new_arrays.js     # redirect
+```
+
+Stats and a per-hour delta-vs-2021 chart go to stderr, so redirecting stdout gives you a clean JS file.
